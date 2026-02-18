@@ -1,0 +1,35 @@
+name: Akira Ransomware Linux Pre-Encryption Simulation
+description: >
+  Simulates the pre-encryption behavioral chain observed in Akira ransomware on Linux hosts.
+  The test replicates three key steps: (1) removing the immutable file attribute via chattr -i
+  to allow file modification (T1222.002), (2) enumerating target files using the find command
+  (T1083), and (3) renaming files with the .akira extension to simulate encryption output (T1486).
+  References: https://www.elastic.co/security-labs/akira-ransomware-analysis
+  https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-187a
+supported_platforms:
+  - linux
+input_arguments:
+  target_dir:
+    description: Directory to use for test file creation and simulation
+    default: /tmp/akira_test_dir
+    type: path
+dependencies:
+  - description: chattr must be available on the system
+    prereq_command: which chattr
+    get_prereq_command: apt-get install -y e2fsprogs || yum install -y e2fsprogs
+  - description: find must be available on the system
+    prereq_command: which find
+dependency_executor_name: bash
+executor:
+  name: bash
+  elevation_required: true
+  command: |
+    mkdir -p #{target_dir}
+    touch #{target_dir}/document{1..5}.txt
+    chattr +i #{target_dir}/document1.txt
+    chattr -i -R #{target_dir}/
+    find #{target_dir} -type f -name "*.txt"
+    for f in #{target_dir}/*.txt; do mv "$f" "${f}.akira"; done
+  cleanup_command: |
+    chattr -i -R #{target_dir}/ 2>/dev/null || true
+    rm -rf #{target_dir}
