@@ -2,6 +2,7 @@ attack_technique: T1486
 display_name: Data Encrypted for Impact
 atomic_tests:
   - name: Akira Ransomware Linux Pre-Encryption Simulation
+    auto_generated_guid: d3f2e1a0-b4c5-4d6e-8f7a-9b0c1d2e3f4a
     description: >
       Simulates the pre-encryption behavioral chain observed in Akira ransomware on Linux hosts.
       The test replicates three key steps: (1) removing the immutable file attribute via chattr -i
