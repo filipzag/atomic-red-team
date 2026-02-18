@@ -19,17 +19,22 @@ dependencies:
     get_prereq_command: apt-get install -y e2fsprogs || yum install -y e2fsprogs
   - description: find must be available on the system
     prereq_command: which find
+    get_prereq_command: apt-get install -y findutils || yum install -y findutils
 dependency_executor_name: bash
 executor:
   name: bash
   elevation_required: true
   command: |
     mkdir -p #{target_dir}
-    touch #{target_dir}/document{1..5}.txt
+    touch #{target_dir}/document1.txt
+    touch #{target_dir}/document2.txt
+    touch #{target_dir}/document3.txt
+    touch #{target_dir}/document4.txt
+    touch #{target_dir}/document5.txt
     chattr +i #{target_dir}/document1.txt
     chattr -i -R #{target_dir}/
     find #{target_dir} -type f -name "*.txt"
-    for f in #{target_dir}/*.txt; do mv "$f" "${f}.akira"; done
+    find #{target_dir} -type f -name "*.txt" | while read f; do mv "$f" "${f}.akira"; done
   cleanup_command: |
     chattr -i -R #{target_dir}/ 2>/dev/null || true
     rm -rf #{target_dir}
