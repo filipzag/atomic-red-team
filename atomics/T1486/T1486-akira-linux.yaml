@@ -24,9 +24,9 @@ atomic_tests:
       - description: find must be available on the system
         prereq_command: which find
         get_prereq_command: apt-get install -y findutils || yum install -y findutils
-    dependency_executor_name: bash
+    dependency_executor_name: sh
     executor:
-      name: bash
+      name: sh
       elevation_required: true
       command: |
         mkdir -p #{target_dir}
