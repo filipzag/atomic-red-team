@@ -1,0 +1,50 @@
+name: LD_PRELOAD Privilege Escalation via Shared Library Injection
+description: |
+  Simulates an attacker using the LD_PRELOAD environment variable to inject a
+  malicious shared library into a process execution. When used with SUID binaries
+  or sudo, this allows arbitrary code execution with elevated privileges.
+  This test compiles a minimal shared library that writes a marker file when loaded,
+  then executes a target binary with LD_PRELOAD set to the malicious library path.
+  Directly triggers the 'Linux Privilege Escalation via LD_PRELOAD Hijacking' detection rule.
+  Maps to MITRE ATT&CK T1574.006 (Dynamic Linker Hijacking).
+supported_platforms:
+  - linux
+input_arguments:
+  library_path:
+    description: Path where the malicious shared library will be compiled and stored
+    type: path
+    default: /tmp/atomic_preload.so
+  marker_file:
+    description: File written by the injected library to confirm successful injection
+    type: path
+    default: /tmp/atomic_preload_marker
+  target_binary:
+    description: Target binary to execute with LD_PRELOAD set
+    type: path
+    default: /usr/bin/id
+dependencies:
+  - description: gcc must be installed to compile the shared library
+    prereq_command: which gcc
+    get_prereq_command: |
+      if [ -f /etc/debian_version ]; then apt-get install -y gcc; fi
+      if [ -f /etc/redhat-release ]; then yum install -y gcc; fi
+executor:
+  name: bash
+  elevation_required: false
+  command: |
+    cat > /tmp/atomic_preload.c << 'CSRC'
+    #include <stdio.h>
+    #include <stdlib.h>
+    __attribute__((constructor))
+    void inject() {
+        FILE *f = fopen("#{marker_file}", "w");
+        if (f) { fprintf(f, "LD_PRELOAD injection successful\n"); fclose(f); }
+    }
+    CSRC
+    gcc -shared -fPIC -nostartfiles -o #{library_path} /tmp/atomic_preload.c
+    LD_PRELOAD=#{library_path} #{target_binary}
+    if [ -f #{marker_file} ]; then
+        cat #{marker_file}
+    fi
+  cleanup_command: |
+    rm -f #{library_path} #{marker_file} /tmp/atomic_preload.c
