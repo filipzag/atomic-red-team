@@ -1,0 +1,59 @@
+attack_technique: T1556.003
+display_name: "Modify Authentication Process: Pluggable Authentication Modules"
+atomic_tests:
+  - name: Windigo-Style PAM Configuration Reconnaissance (No Elevation)
+    description: |
+      Simulates Windigo/Ebury reconnaissance of PAM configuration files. The Ebury backdoor 
+      hooks into PAM to intercept SSH credentials. This test enumerates PAM configuration 
+      without requiring root privileges, generating telemetry for detection validation.
+      
+      Reference: https://attack.mitre.org/techniques/T1556/003/
+      Reference: https://www.welivesecurity.com/2014/03/18/operation-windigo-the-vivisection-of-a-large-linux-server-side-credential-stealing-malware-campaign/
+    supported_platforms:
+      - linux
+    input_arguments:
+      output_file:
+        description: File to store PAM reconnaissance results
+        type: path
+        default: /tmp/pam_recon.txt
+    executor:
+      name: sh
+      elevation_required: false
+      command: |
+        ls -la /etc/pam.d/ > #{output_file} 2>&1
+        cat /etc/pam.d/sshd >> #{output_file} 2>&1 || true
+        cat /etc/pam.d/su >> #{output_file} 2>&1 || true
+        cat /etc/pam.d/sudo >> #{output_file} 2>&1 || true
+        find /lib -name "pam_*.so" 2>/dev/null >> #{output_file}
+        find /lib64 -name "pam_*.so" 2>/dev/null >> #{output_file}
+        find /usr/lib -name "pam_*.so" 2>/dev/null >> #{output_file}
+        cat #{output_file}
+      cleanup_command: |
+        rm -f #{output_file}
+
+  - name: Windigo-Style Fake PAM Module Creation (No Elevation)
+    description: |
+      Simulates the creation of a malicious PAM shared object in a user-writable location.
+      While this won't actually be loaded by PAM (requires root), it generates file creation
+      telemetry that can be used to validate detection rules for PAM tampering attempts.
+      
+      Reference: https://attack.mitre.org/techniques/T1556/003/
+    supported_platforms:
+      - linux
+    input_arguments:
+      fake_pam_path:
+        description: Path for the fake PAM module
+        type: path
+        default: /tmp/pam_ebury.so
+    executor:
+      name: sh
+      elevation_required: false
+      command: |
+        cat > #{fake_pam_path} << 'EOF'
+        /* Fake PAM module for detection testing */
+        /* This is NOT a real shared object */
+        WINDIGO_EBURY_TEST_MARKER
+        EOF
+        ls -la #{fake_pam_path}
+      cleanup_command: |
+        rm -f #{fake_pam_path}

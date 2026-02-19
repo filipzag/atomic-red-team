@@ -1,0 +1,36 @@
+attack_technique: T1014
+display_name: Rootkit
+atomic_tests:
+  - name: Windigo-Style Kernel Module Loading Attempt (No Elevation)
+    description: |
+      Simulates Windigo rootkit deployment behavior by attempting to load a kernel module from 
+      suspicious locations (/tmp, /dev/shm, /var/tmp). This test does NOT require root/sudo and 
+      will intentionally fail the insmod/modprobe commands, but the process execution telemetry 
+      will be captured for detection validation.
+      
+      The Windigo threat group deploys kernel-level rootkits (like the Ebury rootkit component) 
+      to hide malicious processes, files, and network connections on compromised Linux servers.
+      
+      Reference: https://attack.mitre.org/techniques/T1014/
+      Reference: https://www.welivesecurity.com/2014/03/18/operation-windigo-the-vivisection-of-a-large-linux-server-side-credential-stealing-malware-campaign/
+    supported_platforms:
+      - linux
+    input_arguments:
+      module_name:
+        description: Name of the fake kernel module file
+        type: string
+        default: windigo_rootkit
+    executor:
+      name: sh
+      elevation_required: false
+      command: |
+        touch /tmp/#{module_name}.ko
+        touch /dev/shm/#{module_name}.ko
+        touch /var/tmp/#{module_name}.ko
+        insmod /tmp/#{module_name}.ko 2>&1 || true
+        insmod /dev/shm/#{module_name}.ko 2>&1 || true
+        modprobe /var/tmp/#{module_name}.ko 2>&1 || true
+      cleanup_command: |
+        rm -f /tmp/#{module_name}.ko
+        rm -f /dev/shm/#{module_name}.ko
+        rm -f /var/tmp/#{module_name}.ko
