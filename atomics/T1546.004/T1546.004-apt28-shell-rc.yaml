@@ -1,0 +1,33 @@
+name: APT28 Shell RC File Persistence Simulation
+description: >
+  Simulates APT28-style persistence by appending a malicious command to a user's shell
+  configuration file (.bashrc). This technique ensures execution on every interactive
+  shell session. The test appends a benign marker comment and a curl command pattern
+  commonly used by threat actors for C2 callbacks.
+  Reference: https://attack.mitre.org/techniques/T1546/004/
+supported_platforms:
+  - linux
+input_arguments:
+  target_rc_file:
+    description: Path to the shell RC file to modify
+    type: path
+    default: /tmp/art-test-bashrc
+  payload_command:
+    description: Simulated malicious command to append (benign for testing)
+    type: string
+    default: "# ART-T1546.004-test-marker"
+executor:
+  name: bash
+  elevation_required: false
+  command: |
+    touch #{target_rc_file}
+    cp #{target_rc_file} #{target_rc_file}.art-backup
+    cat >> #{target_rc_file} <<EOF
+    #{payload_command}
+    EOF
+  cleanup_command: |
+    if [ -f #{target_rc_file}.art-backup ]; then
+      mv #{target_rc_file}.art-backup #{target_rc_file}
+    else
+      rm -f #{target_rc_file}
+    fi
