@@ -1,0 +1,27 @@
+attack_technique: T1560.001
+display_name: "Archive Collected Data: Archive via Utility"
+atomic_tests:
+- name: Linux Sensitive File Archiving for Exfiltration
+  description: |
+    Simulates APT39-style pre-exfiltration behavior by using tar to archive sensitive system files
+    including /etc/passwd, /etc/shadow, and SSH keys into a staging directory (/tmp).
+    This tests detection of T1560.001 (Archive via Utility) targeting high-value credential
+    and configuration files commonly collected before data exfiltration.
+  supported_platforms:
+    - linux
+  input_arguments:
+    output_file:
+      description: Path for the output archive file
+      type: path
+      default: /tmp/staged_exfil.tar.gz
+    target_files:
+      description: Space-separated list of sensitive files/directories to archive
+      type: string
+      default: /etc/passwd /etc/shadow /etc/ssh /root/.ssh
+  executor:
+    name: bash
+    elevation_required: true
+    command: |
+      tar -czf #{output_file} #{target_files} 2>/dev/null
+    cleanup_command: |
+      rm -f #{output_file}
