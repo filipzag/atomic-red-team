@@ -8,16 +8,7 @@ atomic_tests:
   supported_platforms:
   - linux
   - macos
-  input_arguments:
-    input_files:
-      description: Path that should be compressed into our output file, may include wildcards
-      type: path
-      default: "/var/log/{w,b}tmp"
-    output_file:
-      description: Path that should be output as a zip archive
-      type: path
-      default: $HOME/data.zip
-  dependency_executor_name: null
+  dependency_executor_name: bash
   dependencies:
   - description: |
       Files to zip must exist (#{input_files})
@@ -26,13 +17,22 @@ atomic_tests:
     get_prereq_command: |
       (which yum && yum -y install epel-release zip)||(which apt-get && apt-get install -y zip)
       echo Please set input_files argument to include files that exist
+  input_arguments:
+    input_files:
+      description: Path that should be compressed into our output file, may include wildcards
+      type: path
+      default: /var/log/{w,b}tmp
+    output_file:
+      description: Path that should be output as a zip archive
+      type: path
+      default: $HOME/data.zip
   executor:
-    name: bash
-    elevation_required: true
     command: |
       zip #{output_file} #{input_files}
     cleanup_command: |
       rm -f #{output_file}
+    name: bash
+    elevation_required: true
 
 - name: Data Compressed - nix - gzip Single File
   auto_generated_guid: cde3c2af-3485-49eb-9c1f-0ed60e9cc0af
@@ -51,43 +51,45 @@ atomic_tests:
       type: string
       default: "confidential! SSN: 078-05-1120 - CCN: 4000 1234 5678 9101"
   executor:
-    name: sh
-    elevation_required: false
     command: |
       test -e #{input_file} && gzip -k #{input_file} || (echo '#{input_content}' >> #{input_file}; gzip -k #{input_file})
     cleanup_command: |
       rm -f #{input_file}.gz
+    name: sh
+    elevation_required: false
 
-- name: Data Compressed - nix - tar Folder or File
+- name: Linux Sensitive File Archiving for Exfiltration
   auto_generated_guid: 7af2b51e-ad1c-498c-aca8-d3290c19535a
   description: |
-    An adversary may compress data (e.g., sensitive documents) that is collected prior to exfiltration. This test uses standard gzip compression.
+    Simulates APT39-style pre-exfiltration behavior by using tar to archive sensitive system files
+    including /etc/passwd, /etc/shadow, and SSH keys into a staging directory (/tmp).
+    This tests detection of T1560.001 (Archive via Utility) targeting high-value credential
+    and configuration files commonly collected before data exfiltration.
   supported_platforms:
   - linux
-  - macos
+  dependencies:
+  - description: |
+      Sensitive files must exist
+    prereq_command: |
+      test -e /etc/passwd
+    get_prereq_command: |
+      echo "/etc/passwd should always exist"
   input_arguments:
     input_file_folder:
-      description: Path that should be compressed
+      description: Sensitive files/directories to archive
       type: path
-      default: $HOME/$USERNAME
+      default: /etc/passwd /etc/shadow /root/.ssh
     output_file:
       description: File that should be output
       type: path
-      default: $HOME/data.tar.gz
-  dependencies:
-  - description: |
-      Folder to zip must exist (#{input_file_folder})
-    prereq_command: |
-      test -e #{input_file_folder}
-    get_prereq_command: |
-      mkdir -p #{input_file_folder} && touch #{input_file_folder}/file1
+      default: /tmp/staged_exfil.tar.gz
   executor:
-    name: sh
-    elevation_required: false
     command: |
       tar -cvzf #{output_file} #{input_file_folder}
     cleanup_command: |
       rm -f #{output_file}
+    name: bash
+    elevation_required: true
 
 - name: Data Encrypted with zip and gpg symmetric
   auto_generated_guid: 0286eb44-e7ce-41a0-b109-3da516e05a5f
@@ -96,6 +98,13 @@ atomic_tests:
   supported_platforms:
   - linux
   - macos
+  dependency_executor_name: sh
+  dependencies:
+  - description: gpg and zip are required to run the test.
+    prereq_command: |
+      if [ ! -x "$(command -v gpg)" ] || [ ! -x "$(command -v zip)" ]; then exit 1; fi;
+    get_prereq_command: |
+      (which pkg && pkg install -y gnupg zip)||(which yum && yum -y install epel-release zip gpg)||(which apt-get && apt-get install -y zip gpg)
   input_arguments:
     test_folder:
       description: Path used to store files.
@@ -109,16 +118,7 @@ atomic_tests:
       description: Password used to encrypt data.
       type: string
       default: InsertPasswordHere
-  dependency_executor_name: sh
-  dependencies:
-  - description: gpg and zip are required to run the test.
-    prereq_command: |
-      if [ ! -x "$(command -v gpg)" ] || [ ! -x "$(command -v zip)" ]; then exit 1; fi;
-    get_prereq_command: |
-      (which pkg && pkg install -y gnupg zip)||(which yum && yum -y install epel-release zip gpg)||(which apt-get && apt-get install -y zip gpg)
   executor:
-    name: sh
-    elevation_required: false
     command: |
       mkdir -p #{test_folder}
       cd #{test_folder}; touch a b c d e f g
@@ -127,6 +127,8 @@ atomic_tests:
       ls -l #{test_folder}
     cleanup_command: |
       rm -Rf #{test_folder}
+    name: sh
+    elevation_required: false
 
 - name: Encrypts collected data with AES-256 and Base64
   auto_generated_guid: a743e3a6-e8b2-4a30-abe7-ca85d201b5d3
@@ -138,6 +140,13 @@ atomic_tests:
   supported_platforms:
   - linux
   - macos
+  dependency_executor_name: bash
+  dependencies:
+  - description: The folder and test files must exist
+    prereq_command: |
+      if [ ! -d #{input_folder} ]; then exit 1; else exit 0; fi;
+    get_prereq_command: |
+      if [ ! -d #{input_folder} ]; then mkdir -p #{input_folder}; cd #{input_folder}; touch {a..z}.data; fi;
   input_arguments:
     input_folder:
       description: Path to the folder used to store the test files
@@ -151,45 +160,12 @@ atomic_tests:
       description: Password used to encrypt the data
       type: string
       default: atomic_enc_pass
-  dependency_executor_name: bash
-  dependencies:
-  - description: The folder and test files must exist
-    prereq_command: |
-      if [ ! -d #{input_folder} ]; then exit 1; else exit 0; fi;
-    get_prereq_command: |
-      if [ ! -d #{input_folder} ]; then mkdir -p #{input_folder}; cd #{input_folder}; touch {a..z}.data; fi;
   executor:
-    name: bash
-    elevation_required: false
     command: |
       zip -r  #{input_folder}/#{input_file}.zip #{input_folder}
       openssl enc -aes-256-cbc -pass pass:#{enc_pass} -p -in #{input_folder}/#{input_file}.zip -out #{input_folder}/#{input_file}.enc
       cat #{input_folder}/#{input_file}.enc | base64
     cleanup_command: |
       rm -rf #{input_folder}
-
-- name: Linux Sensitive File Archiving for Exfiltration
-  auto_generated_guid: f1234abc-5678-90de-f012-abcdef345678
-  description: |
-    Simulates APT39-style pre-exfiltration behavior by using tar to archive sensitive system files
-    including /etc/passwd, /etc/shadow, and SSH keys into a staging directory (/tmp).
-    This tests detection of T1560.001 (Archive via Utility) targeting high-value credential
-    and configuration files commonly collected before data exfiltration.
-  supported_platforms:
-  - linux
-  input_arguments:
-    output_file:
-      description: Path for the output archive file
-      type: path
-      default: /tmp/staged_exfil.tar.gz
-    target_files:
-      description: Space-separated list of sensitive files/directories to archive
-      type: string
-      default: /etc/passwd /etc/shadow /etc/ssh /root/.ssh
-  executor:
     name: bash
-    elevation_required: true
-    command: |
-      tar -czf #{output_file} #{target_files} 2>/dev/null
-    cleanup_command: |
-      rm -f #{output_file}
+    elevation_required: false
