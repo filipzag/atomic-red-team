@@ -69,7 +69,7 @@ atomic_tests:
     input_file_folder:
       description: Path that should be compressed
       type: path
-      default: "$HOME/$USERNAME"
+      default: $HOME/$USERNAME
     output_file:
       description: File that should be output
       type: path
@@ -169,7 +169,7 @@ atomic_tests:
       rm -rf #{input_folder}
 
 - name: Linux Sensitive File Archiving for Exfiltration
-  auto_generated_guid: f1e28917-b7e4-4a5e-9f68-0e1f6e3c7a92
+  auto_generated_guid: f1234abc-5678-90de-f012-abcdef345678
   description: |
     Simulates APT39-style pre-exfiltration behavior by using tar to archive sensitive system files
     including /etc/passwd, /etc/shadow, and SSH keys into a staging directory (/tmp).
@@ -185,7 +185,7 @@ atomic_tests:
     target_files:
       description: Space-separated list of sensitive files/directories to archive
       type: string
-      default: /etc/passwd /etc/shadow
+      default: /etc/passwd /etc/shadow /etc/ssh /root/.ssh
   executor:
     name: bash
     elevation_required: true
