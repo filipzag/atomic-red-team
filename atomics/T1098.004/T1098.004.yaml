@@ -1,20 +1,49 @@
----
 attack_technique: T1098.004
-display_name: SSH Authorized Keys
-
+display_name: "Account Manipulation: SSH Authorized Keys"
 atomic_tests:
 - name: Modify SSH Authorized Keys
-  auto_generated_guid: 342cc723-127c-4d3a-8292-9c0c6b4ecadc
   description: |
-    Modify contents of <user-home>/.ssh/authorized_keys to maintain persistence on victim host. 
+    Modify contents of <user-home>/.ssh/authorized_keys to maintain persistence on victim host.
     If the user is able to save the same contents in the authorized_keys file, it shows user can modify the file.
   supported_platforms:
-    - linux
-    - macos
+  - linux
+  - macos
   executor:
     name: sh
-    elevation_required: false 
-    command: | 
+    elevation_required: false
+    command: |
       if [ -f ~/.ssh/authorized_keys ]; then ssh_authorized_keys=$(cat ~/.ssh/authorized_keys); echo "$ssh_authorized_keys" > ~/.ssh/authorized_keys; fi;
-    cleanup_command: | 
+    cleanup_command: |
       unset ssh_authorized_keys
+  auto_generated_guid: 342cc723-127c-4d3a-8292-9c0c6b4ecadc
+
+- name: SSH Authorized Keys Persistence via Rogue Key Injection
+  description: |
+    Simulates an attacker injecting a rogue SSH public key into a user's authorized_keys file to establish persistent access.
+    This creates the .ssh directory and authorized_keys file if they don't exist, writes a fake SSH public key,
+    and generates file creation/modification events detectable by endpoint security tools.
+    This technique is commonly used by APT39 and other Iranian threat groups for Linux persistence.
+  supported_platforms:
+  - linux
+  input_arguments:
+    target_user_home:
+      description: Target user home directory for SSH key injection
+      type: path
+      default: /tmp/art-ssh-test
+    rogue_key:
+      description: Fake SSH public key to inject
+      type: string
+      default: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC3 attacker@malicious-host"
+  executor:
+    name: bash
+    elevation_required: false
+    command: |
+      mkdir -p #{target_user_home}/.ssh
+      touch #{target_user_home}/.ssh/authorized_keys
+      chmod 600 #{target_user_home}/.ssh/authorized_keys
+      /bin/bash -c 'cat >> #{target_user_home}/.ssh/authorized_keys <<EOF
+      #{rogue_key}
+      EOF'
+    cleanup_command: |
+      rm -rf #{target_user_home}/.ssh
+      rmdir #{target_user_home} 2>/dev/null || true
