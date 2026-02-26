@@ -102,12 +102,11 @@ atomic_tests:
       type: string
   auto_generated_guid: 2d943c18-e74a-44bf-936f-25ade6cccab4
 
-- name: "Linux Cron Persistence - Write and Execute Suspicious Cron Job"
+- name: "Linux Cron Persistence - Install Cron and Create Suspicious Cron Job"
   description: |
-    Simulates APT39-style cron persistence by writing a cron job to /etc/cron.d/ that executes
-    a bash reverse shell command via cron. The test creates a cron entry that runs every minute,
-    triggering cron to spawn a suspicious child process (bash). This validates detection of the
-    full attack chain: crontab file creation followed by suspicious cron child process execution.
+    Installs cron if not present, then simulates APT39-style cron persistence by writing a cron job
+    to /etc/cron.d/ that executes a bash payload via cron. Validates the full attack chain: crontab
+    file creation followed by suspicious cron child process execution (bash, curl).
   supported_platforms:
     - linux
   input_arguments:
@@ -119,10 +118,18 @@ atomic_tests:
       description: Path to the payload script
       default: /tmp/art_cron_payload.sh
       type: path
+  dependencies:
+    - description: Cron must be installed
+      prereq_command: which cron || which crond
+      get_prereq_command: |
+        if [ -f /etc/debian_version ]; then apt-get update && apt-get install -y cron; elif [ -f /etc/redhat-release ]; then yum install -y cronie; fi
+  dependency_executor_name: bash
   executor:
     name: bash
     elevation_required: true
     command: |
+      mkdir -p /etc/cron.d
+      service cron start 2>/dev/null || service crond start 2>/dev/null || cron 2>/dev/null || crond 2>/dev/null
       cat > #{payload_file} <<'PAYLOAD'
       #!/bin/bash
       touch /tmp/art_cron_triggered
@@ -133,7 +140,7 @@ atomic_tests:
       * * * * * root #{payload_file}
       CRON
       sleep 65
-      test -f /tmp/art_cron_triggered && cat /tmp/art_cron_triggered
+      test -f /tmp/art_cron_triggered
     cleanup_command: |
       rm -f #{cron_file}
       rm -f #{payload_file}
